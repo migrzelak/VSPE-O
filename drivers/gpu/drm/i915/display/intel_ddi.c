@@ -1172,14 +1172,59 @@ static void icl_ddi_combo_vswing_program(struct intel_encoder *encoder,
 					 const struct intel_crtc_state *crtc_state)
 {
 	struct intel_display *display = to_intel_display(encoder);
-	const struct intel_ddi_buf_trans *trans;
+	const struct intel_ddi_buf_trans *trans, *ref_trans;
 	enum phy phy = intel_encoder_to_phy(encoder);
-	int n_entries, ln;
+	int n_entries, ref_n_entries, ln;
 	u32 val;
 
 	trans = intel_ddi_buf_trans_get(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(display->drm, !trans))
 		return;
+
+	ref_trans = encoder->get_buf_trans(encoder, crtc_state, &ref_n_entries);
+	if (ref_trans) {
+		bool match = true;
+		int chk;
+
+		for (chk = 0; chk < min(trans->num_entries, ref_trans->num_entries); chk++) {
+			const struct icl_ddi_buf_trans *trans_entry = &trans->entries[chk].icl;
+			const struct icl_ddi_buf_trans *ref_entry = &ref_trans->entries[chk].icl;
+
+			if (trans_entry->dw2_swing_sel != ref_entry->dw2_swing_sel) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].icl.dw2_swing_sel mismatch: %u vs %u\n",
+					    chk, trans_entry->dw2_swing_sel, ref_entry->dw2_swing_sel);
+				match = false;
+			}
+			if (trans_entry->dw7_n_scalar != ref_entry->dw7_n_scalar) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].icl.dw7_n_scalar mismatch: %u vs %u\n",
+					    chk, trans_entry->dw7_n_scalar, ref_entry->dw7_n_scalar);
+				match = false;
+			}
+			if (trans_entry->dw4_cursor_coeff != ref_entry->dw4_cursor_coeff) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].icl.dw4_cursor_coeff mismatch: %u vs %u\n",
+					    chk, trans_entry->dw4_cursor_coeff, ref_entry->dw4_cursor_coeff);
+				match = false;
+			}
+			if (trans_entry->dw4_post_cursor_2 != ref_entry->dw4_post_cursor_2) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].icl.dw4_post_cursor_2 mismatch: %u vs %u\n",
+					    chk, trans_entry->dw4_post_cursor_2, ref_entry->dw4_post_cursor_2);
+				match = false;
+			}
+			if (trans_entry->dw4_post_cursor_1 != ref_entry->dw4_post_cursor_1) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].icl.dw4_post_cursor_1 mismatch: %u vs %u\n",
+					    chk, trans_entry->dw4_post_cursor_1, ref_entry->dw4_post_cursor_1);
+				match = false;
+			}
+		}
+
+		if (match)
+			drm_dbg_kms(display->drm, "mig: icl buf_trans match\n");
+	}
 
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_EDP)) {
 		struct intel_dp *intel_dp = enc_to_intel_dp(encoder);
@@ -1289,8 +1334,8 @@ static void icl_mg_phy_set_signal_levels(struct intel_encoder *encoder,
 {
 	struct intel_display *display = to_intel_display(encoder);
 	enum tc_port tc_port = intel_encoder_to_tc(encoder);
-	const struct intel_ddi_buf_trans *trans;
-	int n_entries, ln;
+	const struct intel_ddi_buf_trans *trans, *ref_trans;
+	int n_entries, ref_n_entries, ln;
 
 	if (intel_tc_port_in_tbt_alt_mode(enc_to_dig_port(encoder)))
 		return;
@@ -1298,6 +1343,39 @@ static void icl_mg_phy_set_signal_levels(struct intel_encoder *encoder,
 	trans = intel_ddi_buf_trans_get(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(display->drm, !trans))
 		return;
+
+	ref_trans = encoder->get_buf_trans(encoder, crtc_state, &ref_n_entries);
+	if (ref_trans) {
+		bool match = true;
+		int chk;
+
+		for (chk = 0; chk < min(trans->num_entries, ref_trans->num_entries); chk++) {
+			const struct icl_mg_phy_ddi_buf_trans *trans_entry = &trans->entries[chk].mg;
+			const struct icl_mg_phy_ddi_buf_trans *ref_entry = &ref_trans->entries[chk].mg;
+
+			if (trans_entry->cri_txdeemph_override_11_6 != ref_entry->cri_txdeemph_override_11_6) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].mg.cri_txdeemph_override_11_6 mismatch: %u vs %u\n",
+					    chk, trans_entry->cri_txdeemph_override_11_6, ref_entry->cri_txdeemph_override_11_6);
+				match = false;
+			}
+			if (trans_entry->cri_txdeemph_override_5_0 != ref_entry->cri_txdeemph_override_5_0) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].mg.cri_txdeemph_override_5_0 mismatch: %u vs %u\n",
+					    chk, trans_entry->cri_txdeemph_override_5_0, ref_entry->cri_txdeemph_override_5_0);
+				match = false;
+			}
+			if (trans_entry->cri_txdeemph_override_17_12 != ref_entry->cri_txdeemph_override_17_12) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].mg.cri_txdeemph_override_17_12 mismatch: %u vs %u\n",
+					    chk, trans_entry->cri_txdeemph_override_17_12, ref_entry->cri_txdeemph_override_17_12);
+				match = false;
+			}
+		}
+
+		if (match)
+			drm_dbg_kms(display->drm, "mig: mg buf_trans match\n");
+	}
 
 	for (ln = 0; ln < 2; ln++) {
 		intel_de_rmw(display, MG_TX1_LINK_PARAMS(ln, tc_port),

@@ -296,14 +296,53 @@ void bxt_dpio_phy_set_signal_levels(struct intel_encoder *encoder,
 				    const struct intel_crtc_state *crtc_state)
 {
 	struct intel_display *display = to_intel_display(encoder);
-	const struct intel_ddi_buf_trans *trans;
+	const struct intel_ddi_buf_trans *trans, *ref_trans;
 	enum dpio_channel ch;
 	enum dpio_phy phy;
-	int lane, n_entries;
+	int lane, n_entries, ref_n_entries;
 
 	trans = intel_ddi_buf_trans_get(encoder, crtc_state, &n_entries);
 	if (drm_WARN_ON_ONCE(display->drm, !trans))
 		return;
+
+	ref_trans = encoder->get_buf_trans(encoder, crtc_state, &ref_n_entries);
+	if (ref_trans) {
+		bool match = true;
+		int i;
+
+		for (i = 0; i < min(trans->num_entries, ref_trans->num_entries); i++) {
+			const struct bxt_ddi_buf_trans *trans_entry = &trans->entries[i].bxt;
+			const struct bxt_ddi_buf_trans *ref_entry = &ref_trans->entries[i].bxt;
+
+			if (trans_entry->margin != ref_entry->margin) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].bxt.margin mismatch: %u vs %u\n",
+					    i, trans_entry->margin, ref_entry->margin);
+				match = false;
+			}
+			if (trans_entry->scale != ref_entry->scale) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].bxt.scale mismatch: %u vs %u\n",
+					    i, trans_entry->scale, ref_entry->scale);
+				match = false;
+			}
+			if (trans_entry->enable != ref_entry->enable) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].bxt.enable mismatch: %u vs %u\n",
+					    i, trans_entry->enable, ref_entry->enable);
+				match = false;
+			}
+			if (trans_entry->deemphasis != ref_entry->deemphasis) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].bxt.deemphasis mismatch: %u vs %u\n",
+					    i, trans_entry->deemphasis, ref_entry->deemphasis);
+				match = false;
+			}
+		}
+
+		if (match)
+			drm_dbg_kms(display->drm, "mig: bxt buf_trans match\n");
+	}
 
 	bxt_port_to_phy_channel(display, encoder->port, &phy, &ch);
 

@@ -480,10 +480,10 @@ void intel_cx0_phy_set_signal_levels(struct intel_encoder *encoder,
 				     const struct intel_crtc_state *crtc_state)
 {
 	struct intel_display *display = to_intel_display(encoder);
-	const struct intel_ddi_buf_trans *trans;
+	const struct intel_ddi_buf_trans *trans, *ref_trans;
 	u8 owned_lane_mask;
 	struct ref_tracker *wakeref;
-	int n_entries, ln;
+	int n_entries, ref_n_entries, ln;
 	struct intel_digital_port *dig_port = enc_to_dig_port(encoder);
 
 	if (intel_tc_port_in_tbt_alt_mode(dig_port))
@@ -497,6 +497,39 @@ void intel_cx0_phy_set_signal_levels(struct intel_encoder *encoder,
 	if (drm_WARN_ON_ONCE(display->drm, !trans)) {
 		intel_cx0_phy_transaction_end(encoder, wakeref);
 		return;
+	}
+
+	ref_trans = encoder->get_buf_trans(encoder, crtc_state, &ref_n_entries);
+	if (ref_trans) {
+		bool match = true;
+		int i;
+
+		for (i = 0; i < min(trans->num_entries, ref_trans->num_entries); i++) {
+			const struct dg2_snps_phy_buf_trans *trans_entry = &trans->entries[i].snps;
+			const struct dg2_snps_phy_buf_trans *ref_entry = &ref_trans->entries[i].snps;
+
+			if (trans_entry->vswing != ref_entry->vswing) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].snps.vswing mismatch: %u vs %u\n",
+					    i, trans_entry->vswing, ref_entry->vswing);
+				match = false;
+			}
+			if (trans_entry->pre_cursor != ref_entry->pre_cursor) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].snps.pre_cursor mismatch: %u vs %u\n",
+					    i, trans_entry->pre_cursor, ref_entry->pre_cursor);
+				match = false;
+			}
+			if (trans_entry->post_cursor != ref_entry->post_cursor) {
+				drm_dbg_kms(display->drm,
+					    "mig: entry[%d].snps.post_cursor mismatch: %u vs %u\n",
+					    i, trans_entry->post_cursor, ref_entry->post_cursor);
+				match = false;
+			}
+		}
+
+		if (match)
+			drm_dbg_kms(display->drm, "mig: snps buf_trans match\n");
 	}
 
 	intel_c10_msgbus_access_begin(encoder, owned_lane_mask);
