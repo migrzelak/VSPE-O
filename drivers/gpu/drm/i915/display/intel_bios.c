@@ -3914,6 +3914,8 @@ intel_bios_get_c20_vspeo(const struct intel_bios_encoder_data *devdata,
 
 	offset += idx * num_rows * num_columns;
 
+	drm_dbg_kms(display->drm, "VS/PE-O index used: %d\n", idx);
+
 	for (level = 0; level < num_rows; level++) {
 		u32 vswing = tables[offset];
 		u32 pre_cursor = tables[offset + 1];
@@ -3958,6 +3960,8 @@ intel_bios_get_c10_vspeo(const struct intel_bios_encoder_data *devdata,
 
 	offset += idx * num_rows * num_columns;
 
+	drm_dbg_kms(display->drm, "VS/PE-O index used: %d\n", idx);
+
 	for (level = 0; level < num_rows; level++) {
 		u32 vswing = tables[offset];
 		u32 pre_cursor = tables[offset + 1];
@@ -3998,8 +4002,11 @@ intel_bios_get_ehl_combo_vspeo(const struct intel_bios_encoder_data *devdata,
 	num_rows = display->vbt.vspeo.num_rows;
 
 	idx = port_clock > 270000 ? 1 : 0;
-	if (has_edp)
+	drm_dbg_kms(display->drm, "1. VS/PE-O index used: %d\n", idx);
+	if (has_edp) {
 		idx = port_clock > 540000 ? 2 : 1;
+		drm_dbg_kms(display->drm, "2. VS/PE-O index used: %d\n", idx);
+	}
 
 	offset += idx * num_rows * num_columns;
 
@@ -4048,15 +4055,21 @@ intel_bios_get_jsl_combo_vspeo(const struct intel_bios_encoder_data *devdata,
 
 	idx = 0;
 	if (low_vswing_edp) {
-		if (port_clock > 540000)
+		if (port_clock > 540000) {
 			idx = 0;
-		else if (port_clock > 270000)
+			drm_dbg_kms(display->drm, "a. VS/PE-O index used: %d\n", idx);
+		} else if (port_clock > 270000) {
 			idx = 1;
-		else
+			drm_dbg_kms(display->drm, "b. VS/PE-O index used: %d\n", idx);
+		} else {
 			idx = 2;
+			drm_dbg_kms(display->drm, "c. VS/PE-O index used: %d\n", idx);
+		}
 	}
 
 	offset += idx * num_rows * num_columns;
+
+	drm_dbg_kms(display->drm, "2. VS/PE-O index used: %d\n", idx);
 
 	for (level = 0; level < num_rows; level++) {
 		u32 dw2_swing_sel = tables[offset];
